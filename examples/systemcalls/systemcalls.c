@@ -1,5 +1,8 @@
 #include "systemcalls.h"
-
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <sys/wait.h>
 /**
  * @param cmd the command to execute with system()
  * @return true if the command in @param cmd was executed
@@ -16,8 +19,12 @@ bool do_system(const char *cmd)
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */
+	int status = system(cmd);
 
-    return true;
+	if(WIFEXITED(status)==true && WEXITSTATUS(status)==0 && status!= -1)
+		return true;
+	else
+    		return false;
 }
 
 /**
@@ -61,6 +68,26 @@ bool do_exec(int count, ...)
 
     va_end(args);
 
+    fflush(stdout);
+
+    pid_t pid = fork();
+    if(pid == -1)
+	    return false;
+
+    if(pid == 0) //child process
+	{
+		execv(command[0],command);
+		exit(1);
+	}
+    else
+    {
+	int status,temp;
+	temp = waitpid(pid, &status, 0);
+	if(temp == -1)
+		return false;
+	return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+    }
+
     return true;
 }
 
@@ -94,6 +121,32 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
 */
 
     va_end(args);
+
+    fflush(stdout);
+
+    pid_t pid = fork();
+    if(pid == -1)
+	    return false;
+
+    if(pid == 0)
+    {
+	int file = open(outputfile, O_WRONLY|O_CREAT|O_TRUNC);
+	if(file == -1)
+		exit(1);
+
+	if(dup2(file, STDOUT_FILENO)==-1)
+		exit(1);
+	close(file);
+	execv(command[0],command);
+	exit(1);
+    }
+    else
+    {
+	    int status;
+	   if( waitpid(pid, &status, 0)== -1)
+		   return false;
+	   return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+    }
 
     return true;
 }
