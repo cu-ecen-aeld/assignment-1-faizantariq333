@@ -94,8 +94,31 @@ ${CROSS_COMPILE}readelf -a ${OUTDIR}/rootfs/bin/busybox | grep "program interpre
 ${CROSS_COMPILE}readelf -a ${OUTDIR}/rootfs/bin/busybox | grep "Shared library"
 
 # TODO: Add library dependencies to rootfs
-cp /home/yocto/test/arm_toolchain/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu/libc/lib/ld-linux-aarch64.so.1 ${OUTDIR}/rootfs/lib
-cp /home/yocto/test/arm_toolchain/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu/libc/lib64/libm.so.6 /home/yocto/test/arm_toolchain/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu/libc/lib64/libresolv.so.2 /home/yocto/test/arm_toolchain/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu/libc/lib64/libc.so.6 ${OUTDIR}/rootfs/lib64
+#cp /home/yocto/test/arm_toolchain/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu/libc/lib/ld-linux-aarch64.so.1 ${OUTDIR}/rootfs/lib
+#cp /home/yocto/test/arm_toolchain/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu/libc/lib64/libm.so.6 /home/yocto/test/arm_toolchain/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu/libc/lib64/libresolv.so.2 /home/yocto/test/arm_toolchain/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu/libc/lib64/libc.so.6 ${OUTDIR}/rootfs/lib64
+
+program_interpreter_target=$(${CROSS_COMPILE}readelf -a "${OUTDIR}/rootfs/bin/busybox" | grep "program interpreter" | awk '{ sub(/.*: /, ""); sub(/].*/, ""); print }')
+echo "program interpreter target = ${program_interpreter_target}"
+program_interpreter_source=$(find /usr -name "$(basename ${program_interpreter_target})" 2>/dev/null)
+echo "program interpreter source = ${program_interpreter_source}"
+cp "${program_interpreter_source}" "${OUTDIR}/rootfs/${program_interpreter_target}"
+
+library_filenames=()
+library_sources=()
+while IFS= read -r line; do
+    library_filenames+=( "$(echo "$line" | grep -oP '(?<=[[])[^]]*')" )
+done < <(${CROSS_COMPILE}readelf -a "${OUTDIR}/rootfs/bin/busybox" | grep "Shared library")
+for element in "${library_filenames[@]}"
+do
+    library_sources+=( "$(find / -name "$element" 2>/dev/null | grep "aarch64")" )
+    echo "$element"
+done
+for element in "${library_sources[@]}"
+do
+    echo "library source: $element"
+    cp "$element" "${OUTDIR}/rootfs/lib64"
+done
+
 
 echo "adding device nodes"
 # TODO: Make device nodes
